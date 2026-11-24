@@ -71,7 +71,8 @@ class LibrarySession {
 public:
     LibrarySession(void* window_abi, unsigned swap_width, unsigned swap_height,
                    const std::filesystem::path& library_root, const std::function<void()>& seed_files,
-                   std::string_view pick, std::string_view first_notice, std::uint64_t* program_id_out);
+                   std::string_view pick, std::string_view first_notice, std::uint64_t* program_id_out,
+                   std::string_view focus_path = {});
     LibrarySession(const LibrarySession&) = delete;
     LibrarySession& operator=(const LibrarySession&) = delete;
 
@@ -236,6 +237,7 @@ private:
     std::string_view auto_pick;
     std::string_view initial_notice;
     std::uint64_t* selected_program_id;
+    std::string_view initial_focus;
     /// What Run returns once a method says the library is done (nullopt: the app ends).
     std::optional<std::string> launch;
 
