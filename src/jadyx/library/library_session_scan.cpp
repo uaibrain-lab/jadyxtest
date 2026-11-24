@@ -87,6 +87,11 @@ void LibrarySession::RefreshPlay(std::string_view keep) {
 void LibrarySession::RefreshPulse() {
     PulseSessions::Prune();
     for (auto& entry : scan.entries) {
+        if (IsForeignMedia(ClassifyMediaPath(entry.launch_path))) {
+            entry.pulse_saved.clear();
+            entry.pulse_current = false;
+            continue;
+        }
         const auto kept = PulseSessions::Find(entry.launch_path);
         entry.pulse_saved = kept ? PulseSessions::FormatTime(kept->saved) : std::wstring{};
         entry.pulse_current = kept && kept->current;
@@ -275,6 +280,18 @@ void LibrarySession::AutoPick() {
 }
 
 void LibrarySession::StartValidation(bool on_game) {
+    if (actions & Play && on_game && !configuration.open && !settings &&
+        !panel.BindingEditorOpen() && !loading && selected < scan.entries.size()) {
+        const auto media = ClassifyMediaPath(scan.entries[selected].launch_path);
+        if (IsForeignMedia(media)) {
+            notice = Tr(media == MediaKind::AmbiguousDisc ? T::UniversalDiscUnassigned :
+                                                           T::UniversalEngineUnavailable);
+            actions &= ~Play;
+            auto_pick.clear();
+            dirty = true;
+            return;
+        }
+    }
     if (actions & Play && on_game && !configuration.open && !settings && !panel.BindingEditorOpen() && !loading &&
         !scan.entries.empty() && !network_portal.BlockForLocalOperation()) {
         notice=Tr(T::NetworkBusy); actions &= ~Play; dirty=true;
