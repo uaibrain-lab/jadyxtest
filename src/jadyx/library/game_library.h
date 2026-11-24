@@ -32,6 +32,31 @@ constexpr MediaKind ClassifyMediaExtension(std::string_view ext) {
     return MediaKind::Unknown;
 }
 
+// Classify the filename only, including token-scoped USB paths. Do not guess ISO platform.
+inline MediaKind ClassifyMediaPath(std::string_view path) {
+    const auto separator = path.find_last_of("/\\");
+    const auto dot = path.find_last_of('.');
+    if (dot == std::string_view::npos ||
+        (separator != std::string_view::npos && dot < separator)) return MediaKind::Unknown;
+    std::string ext{path.substr(dot)};
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return ClassifyMediaExtension(ext);
+}
+
+inline GamePlatform PlatformForMedia(MediaKind kind) {
+    switch (kind) {
+    case MediaKind::PS2Disc: return GamePlatform::PS2;
+    case MediaKind::Xbox360Executable: return GamePlatform::Xbox360;
+    default: return GamePlatform::Switch;
+    }
+}
+
+inline bool IsForeignMedia(MediaKind kind) {
+    return kind == MediaKind::PS2Disc || kind == MediaKind::Xbox360Executable ||
+           kind == MediaKind::AmbiguousDisc;
+}
+
 struct LibraryEntry {
     std::filesystem::path relative_path;
     std::wstring name;
