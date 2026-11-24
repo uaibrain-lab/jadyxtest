@@ -17,6 +17,21 @@ namespace Jadyx {
 /// Launch path the library returns to run the firmware's Mii editor instead of a game.
 inline constexpr std::string_view MiiEditorLaunch = "jadyx:mii-editor";
 
+// Stable platform tags for catalog and storage routing, independent of guest title IDs.
+enum class GamePlatform : std::uint8_t { Switch = 0, PS2 = 1, Xbox360 = 2, NativePort = 3 };
+
+enum class MediaKind : std::uint8_t { Unknown, SwitchPackage, PS2Disc, Xbox360Executable, AmbiguousDisc };
+
+// Extension-only recognition is a candidate, never a claim that a file is valid or playable.
+constexpr MediaKind ClassifyMediaExtension(std::string_view ext) {
+    if (ext == ".nsp" || ext == ".xci" || ext == ".nro" || ext == ".nsz" ||
+        ext == ".xcz" || ext == ".nca") return MediaKind::SwitchPackage;
+    if (ext == ".chd") return MediaKind::PS2Disc;
+    if (ext == ".xex") return MediaKind::Xbox360Executable;
+    if (ext == ".iso") return MediaKind::AmbiguousDisc;
+    return MediaKind::Unknown;
+}
+
 struct LibraryEntry {
     std::filesystem::path relative_path;
     std::wstring name;
@@ -35,11 +50,13 @@ struct LibraryEntry {
     std::int64_t last_played{};   ///< Unix seconds of the last launch; 0 = never played.
     std::int64_t added{};         ///< Unix seconds the file arrived (its creation); 0 = unknown.
     bool pinned{};                ///< Pinned by the player (favorites.h).
+    GamePlatform platform{GamePlatform::Switch}; ///< Existing catalog entries remain Switch.
 };
 /// The extensions the library lists, lower case with the dot: packages (also compressed),
 /// homebrew, and a loose program NCA.
 inline bool IsGameExtension(std::string_view ext) {
-    return ext == ".nsp" || ext == ".xci" || ext == ".nro" || ext == ".nsz" || ext == ".xcz" || ext == ".nca";
+    // Keep the native Switch scanner unchanged until non-Switch import and dispatch are wired.
+    return ClassifyMediaExtension(ext) == MediaKind::SwitchPackage;
 }
 
 /// Drops the NCAs of an extracted package or firmware from entries[first..]: their folder carries
