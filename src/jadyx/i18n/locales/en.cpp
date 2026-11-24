@@ -98,6 +98,8 @@ const Catalog EnglishCatalog = MakeCatalog({
     {Text::ScanLimit, L"Scan limit reached: 10000 entries, 5 levels."},
     {Text::MetadataFailed, L"Some games' details couldn't be read."},
     {Text::FolderAuthFailed, L"Couldn't authorize or recover the folder: {0}"},
+    {Text::UniversalEngineUnavailable, L"This platform's engine is not available in this build yet."},
+    {Text::UniversalDiscUnassigned, L"Choose a platform for this ISO before launching. ISO registration is not available in this build yet."},
     {Text::GameLoadFailed, L"The game couldn't be loaded. Check the USB drive, permissions and game data."},
     {Text::GameStoppedGpu, L"The game stopped because of a graphics failure or lack of memory."},
     {Text::LibraryScanFailed, L"Some game folders couldn't be read. Check the USB drive and its permissions."},
