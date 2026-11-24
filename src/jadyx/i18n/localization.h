@@ -43,6 +43,8 @@ enum class Text : std::uint16_t {
     MetadataFailed,
     FolderAuthFailed,
     GameLoadFailed,
+    UniversalEngineUnavailable,
+    UniversalDiscUnassigned,
     GameStoppedGpu,
     LibraryScanFailed,
 
