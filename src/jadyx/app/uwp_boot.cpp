@@ -316,6 +316,20 @@ bool ChooseLaunch(const Jadyx::BootSurface& surface, u32 session, std::string& l
     return true;
 }
 
+// The native Eden route remains the only registered engine until a real adapter is linked.
+constexpr int EngineUnavailable = 10001;
+constexpr int DiscUnassigned = 10002;
+
+int RunDispatchedBoot(const std::string& path, const Jadyx::BootSurface& surface,
+                      const Jadyx::BootConfig& config) {
+    if (path != Jadyx::MiiEditorLaunch) {
+        const auto media = Jadyx::ClassifyMediaPath(path);
+        if (media == Jadyx::MediaKind::AmbiguousDisc) return DiscUnassigned;
+        if (Jadyx::IsForeignMedia(media)) return EngineUnavailable;
+    }
+    return Jadyx::RunHeadlessBoot(path, surface, config);
+}
+
 /// The boot worker: runs one session on its own thread, since RunHeadlessBoot blocks.
 void RunBootWorker(const Jadyx::BootSurface& surface, const std::optional<std::string>& library_game,
                    u64 library_program_id, std::atomic<bool>& done, std::atomic<int>& boot_status) {
@@ -362,13 +376,13 @@ void RunBootWorker(const Jadyx::BootSurface& surface, const std::optional<std::s
     // Capture any early throw to the diag file instead of a silent exit.
     try {
         WriteDiag("calling RunHeadlessBoot");
-        int rc = Jadyx::RunHeadlessBoot(nro_path, surface, config);
+        int rc = RunDispatchedBoot(nro_path, surface, config);
         if (rc == Jadyx::PULSE_RESUME_FAILED) {
             Jadyx::PulseSessions::SetNotice(Jadyx::I18n::ToUtf8(
                 Jadyx::I18n::Tr(Jadyx::I18n::Text::PulseNotResumed)));
             WritePulseLog("booting the game fresh after a failed resume");
             config.pulse_resume = false;
-            rc = Jadyx::RunHeadlessBoot(nro_path, surface, config);
+            rc = RunDispatchedBoot(nro_path, surface, config);
         }
         boot_status.store(rc);
         WriteDiag("RunHeadlessBoot returned " + std::to_string(rc) + " | " + MemoryReport());
@@ -477,6 +491,10 @@ std::optional<std::string> LibraryNotice(int status) {
     case 15:
         WriteDiag("GPU failure handled; returning to library for recovery");
         return text(Text::GameStoppedGpu);
+    case EngineUnavailable:
+        return text(Text::UniversalEngineUnavailable);
+    case DiscUnassigned:
+        return text(Text::UniversalDiscUnassigned);
     case Jadyx::RETURN_TO_LIBRARY:
         WriteDiag("boot worker joined; back to the library");
         return Jadyx::PulseSessions::TakeNotice();
