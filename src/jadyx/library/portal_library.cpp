@@ -89,7 +89,7 @@ void PortalLibrarySource::Publish(const std::vector<LibraryEntry>& entries, std:
         return std::any_of(next.begin(), next.end(), [&](const auto& g) { return g.info.program_id == application; });
     };
     for (const auto& entry : entries) {
-        if (entry.launch_path.empty()) continue;
+        if (entry.launch_path.empty() || IsForeignMedia(ClassifyMediaPath(entry.launch_path))) continue;
         if (!entry.title_loaded) {
             // A rescan reads metadata again; keep showing what was known of a dump still present
             // rather than emptying the page until the fill reaches it.
