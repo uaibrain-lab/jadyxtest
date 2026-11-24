@@ -287,7 +287,7 @@ void LibrarySession::StartValidation(bool on_game) {
             notice = Tr(media == MediaKind::AmbiguousDisc ? T::UniversalDiscUnassigned :
                                                            T::UniversalEngineUnavailable);
             actions &= ~Play;
-            auto_pick.clear();
+            auto_pick = {};
             dirty = true;
             return;
         }
