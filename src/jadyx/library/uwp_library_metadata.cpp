@@ -51,6 +51,17 @@ void ReadLibraryMetadata(const std::filesystem::path& root, std::vector<LibraryE
     bool have_keys = false;
     for (auto& entry : entries) {
         if (stop.stop_requested()) break;
+        const auto media = ClassifyMediaPath(entry.launch_path);
+        if (IsForeignMedia(media)) {
+            entry.program_id = 0;
+            entry.build_id = {};
+            entry.display_version.clear();
+            entry.icon.clear();
+            entry.developer = media == MediaKind::PS2Disc ? L"PlayStation 2" :
+                              media == MediaKind::Xbox360Executable ? L"Xbox 360" : L"";
+            entry.title_loaded = true;
+            continue; // Never open a foreign image in the Eden loader or its metadata cache.
+        }
         const auto stamp = IsStoragePath(entry.launch_path) ? 0 : LibraryCache::StampFor(root / entry.relative_path);
         // A record stays valid until its own game's updates/DLC change, not anyone else's.
         if (auto record = cache.Load(entry.launch_path, stamp, language, options.icons);
