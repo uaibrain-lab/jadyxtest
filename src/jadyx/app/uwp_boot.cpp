@@ -252,7 +252,7 @@ Jadyx::BootSurface ChooseGameSurface(const Jadyx::BootSurface& surface, const Ja
 /// Reads boot.cfg, shows the library when it asks for one and sizes the game's swapchain. False
 /// when the app ends here.
 bool ChooseLaunch(const Jadyx::BootSurface& surface, u32 session, std::string& library_error,
-                  bool& library_active, LaunchChoice& choice) {
+                  bool& library_active, LaunchChoice& choice, std::string_view focus_path) {
     try {
         const auto install = std::filesystem::path{
             Windows::ApplicationModel::Package::Current().InstalledLocation().Path().c_str()};
@@ -279,7 +279,7 @@ bool ChooseLaunch(const Jadyx::BootSurface& surface, u32 session, std::string& l
             choice.library_game = Jadyx::ShowGameLibrary(surface.core_window, library_surface.width,
                 library_surface.height, local / L"games", [install, local] { SeedUserData(install, local); },
                 session <= 2 && library_error.empty() ? std::string_view{cfg.library_pick} : std::string_view{},
-                library_error, &choice.library_program_id);
+                library_error, &choice.library_program_id, focus_path);
             library_active = false;
             if (!choice.library_game) {
                 WriteDiag("library: closed by user");
@@ -587,9 +587,12 @@ struct BootView : implements<BootView, IFrameworkViewSource, IFrameworkView> {
         // "Back to the library" in the in-game menu shuts the game down inside this process and
         // comes back here: restarting the app is slow and awkward on the console.
         std::string library_error;
+        std::string focus_path;
         for (u32 session = 1;; ++session) {
             LaunchChoice choice;
-            if (!ChooseLaunch(surface, session, library_error, library_active, choice)) return;
+            if (!ChooseLaunch(surface, session, library_error, library_active, choice, focus_path)) return;
+            if (choice.library_game && *choice.library_game != MiiEditorLaunch)
+                focus_path = *choice.library_game;
 
             if (choice.library_game && NativePs2Candidate(*choice.library_game)) {
                 // The library has stopped its workers and released its D3D12 canvas.
