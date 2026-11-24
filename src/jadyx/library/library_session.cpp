@@ -46,9 +46,10 @@ PortalAmiibo AmiiboForPortal() {
 
 LibrarySession::LibrarySession(void* window_abi, unsigned swap_width, unsigned swap_height,
                                const std::filesystem::path& library_root, const std::function<void()>& seed_files,
-                               std::string_view pick, std::string_view first_notice, std::uint64_t* program_id_out)
+                               std::string_view pick, std::string_view first_notice, std::uint64_t* program_id_out,
+                               std::string_view focus_path)
     : core_window{window_abi}, width{swap_width}, height{swap_height}, root{library_root}, seed{seed_files},
-      auto_pick{pick}, initial_notice{first_notice}, selected_program_id{program_id_out},
+      auto_pick{pick}, initial_notice{first_notice}, selected_program_id{program_id_out}, initial_focus{focus_path},
       window{CoreWindow::GetForCurrentThread()},
       canvas{std::make_unique<LibraryCanvas>(core_window, width, height)},
       oversize{ReadOversize(window, width)}, app_memory_limit{ReadAppMemoryLimit()},
