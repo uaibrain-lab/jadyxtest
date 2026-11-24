@@ -98,6 +98,8 @@ const Catalog PortugueseBrazilCatalog = MakeCatalog({
     {Text::ScanLimit, L"Limite de busca atingido: 10000 entradas, 5 níveis."},
     {Text::MetadataFailed, L"Não foi possível ler os dados de alguns jogos."},
     {Text::FolderAuthFailed, L"Não foi possível autorizar ou recuperar a pasta: {0}"},
+    {Text::UniversalEngineUnavailable, L"O motor desta plataforma ainda não está disponível nesta versão."},
+    {Text::UniversalDiscUnassigned, L"Escolha a plataforma desta ISO antes de jogar. O cadastro de ISO ainda não está disponível nesta versão."},
     {Text::GameLoadFailed, L"Não foi possível carregar o jogo. Verifique o USB, as permissões e os dados do jogo."},
     {Text::GameStoppedGpu, L"O jogo parou por uma falha gráfica ou falta de memória."},
     {Text::LibraryScanFailed, L"Não foi possível ler algumas pastas de jogos. Verifique o USB e as permissões dele."},
