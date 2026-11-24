@@ -21,5 +21,6 @@ std::optional<std::string> ShowGameLibrary(void* core_window, unsigned width, un
                                          const std::function<void()>& seed,
                                          std::string_view auto_pick = {},
                                          std::string_view initial_notice = {},
-                                         std::uint64_t* selected_program_id = nullptr);
+                                         std::uint64_t* selected_program_id = nullptr,
+                                         std::string_view focus_path = {});
 } // namespace Jadyx
