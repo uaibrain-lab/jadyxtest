@@ -334,8 +334,9 @@ void ScanFolder(StorageFolder folder, const std::string& token, const std::wstri
                 const auto p = std::filesystem::path{winrt::to_hstring(child).c_str()};
                 auto ext = p.extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                if (!IsGameExtension(ext)) continue;
+                if (!IsCatalogExtension(ext)) continue;
                 LibraryEntry entry{p, p.stem().wstring()};
+                SetCatalogPlatform(entry, ClassifyMediaExtension(ext));
                 entry.launch_path = MakeStoragePath(token, child);
                 entry.source_name = source;
                 // Enumerated items carry their dates: no extra call per file.
