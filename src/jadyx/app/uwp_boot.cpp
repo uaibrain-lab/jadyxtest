@@ -42,6 +42,7 @@
 #include "jadyx/app/boot_crash.h"
 #include "jadyx/app/boot_diag.h"
 #include "jadyx/app/boot_session.h"
+#include "jadyx/app/native_ps2.h"
 #include "jadyx/app/boot_state.h"
 #include "jadyx/app/user_data_seed.h"
 #include "jadyx/i18n/localization.h"
@@ -589,6 +590,26 @@ struct BootView : implements<BootView, IFrameworkViewSource, IFrameworkView> {
         for (u32 session = 1;; ++session) {
             LaunchChoice choice;
             if (!ChooseLaunch(surface, session, library_error, library_active, choice)) return;
+
+            if (choice.library_game && NativePs2Candidate(*choice.library_game)) {
+                // The library has stopped its workers and released its D3D12 canvas.
+                // Unlike Eden, the PCSX2 attach and polling must be on this UI thread.
+                Jadyx::ReleaseLaunchSplash();
+                window.Dispatcher().ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+                library_active = true; // Do not send foreign input into Eden.
+                const int status = RunNativePs2(window, choice.game_surface, *choice.library_game);
+                library_active = false;
+                if (status == NativePs2ReleaseFailed) return;
+                if (status == RETURN_TO_LIBRARY) {
+                    library_error.clear();
+                    continue;
+                }
+                if (auto notice = LibraryNotice(status)) {
+                    library_error = std::move(*notice);
+                    continue;
+                }
+                return;
+            }
 
             std::atomic<bool> done{false};
             // Default to recoverable load failure until the worker reports a real result.
