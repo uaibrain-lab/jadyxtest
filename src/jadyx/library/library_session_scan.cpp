@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 Jadyx Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "jadyx/library/library_session.h"
+#include "jadyx/app/native_ps2.h"
 
 #include "core/core.h"
 #include "core/hle/service/filesystem/filesystem.h"
@@ -283,7 +284,8 @@ void LibrarySession::StartValidation(bool on_game) {
     if (actions & Play && on_game && !configuration.open && !settings &&
         !panel.BindingEditorOpen() && !loading && selected < scan.entries.size()) {
         const auto media = ClassifyMediaPath(scan.entries[selected].launch_path);
-        if (IsForeignMedia(media)) {
+        if (IsForeignMedia(media) &&
+            !(NativePs2Candidate(scan.entries[selected].launch_path) && NativePs2Staged())) {
             notice = Tr(media == MediaKind::AmbiguousDisc ? T::UniversalDiscUnassigned :
                                                            T::UniversalEngineUnavailable);
             actions &= ~Play;
@@ -309,6 +311,12 @@ void LibrarySession::StartValidation(bool on_game) {
             if (old_metadata.joinable()) old_metadata.join();
             winrt::init_apartment(winrt::apartment_type::multi_threaded);
             struct Uninitialize { ~Uninitialize() { winrt::uninit_apartment(); } } guard;
+            if (NativePs2Candidate(path)) {
+                std::error_code ec;
+                const auto file = std::filesystem::path{winrt::to_hstring(path).c_str()};
+                return std::filesystem::is_regular_file(file, ec) && !ec
+                    ? std::string{} : I18n::ToUtf8(Tr(T::GameLoadFailed));
+            }
             if (!HasUsableHeaderKey() && !path.ends_with(".nro"))
                 return I18n::ToUtf8(Tr(T::MissingKeys));
             if (IsStoragePath(path)) {
