@@ -319,6 +319,9 @@ bool ChooseLaunch(const Jadyx::BootSurface& surface, u32 session, std::string& l
 /// The boot worker: runs one session on its own thread, since RunHeadlessBoot blocks.
 void RunBootWorker(const Jadyx::BootSurface& surface, const std::optional<std::string>& library_game,
                    u64 library_program_id, std::atomic<bool>& done, std::atomic<int>& boot_status) {
+    // Signal completion even if apartment initialization or boot setup throws.
+    struct Completion { std::atomic<bool>& flag; ~Completion() { flag.store(true); } } completion{done};
+    try {
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     std::set_terminate(OnTerminate); // per-thread in the MSVC runtime
     std::string nro_path;
@@ -376,7 +379,10 @@ void RunBootWorker(const Jadyx::BootSurface& surface, const std::optional<std::s
     } catch (...) {
         WriteDiag("unknown exception in RunHeadlessBoot");
     }
-    done.store(true);
+    } catch (...) {
+        boot_status.store(2);
+        WriteDiag("boot worker setup failed");
+    }
 }
 
 /// PC: publishes the window mode for the in-game menu and applies the one it asked for. The
@@ -567,7 +573,8 @@ struct BootView : implements<BootView, IFrameworkViewSource, IFrameworkView> {
             if (!ChooseLaunch(surface, session, library_error, library_active, choice)) return;
 
             std::atomic<bool> done{false};
-            std::atomic<int> boot_status{0};
+            // Default to recoverable load failure until the worker reports a real result.
+            std::atomic<int> boot_status{2};
             std::thread worker([&done, &boot_status, &choice] {
                 RunBootWorker(choice.game_surface, choice.library_game, choice.library_program_id, done, boot_status);
             });
