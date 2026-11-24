@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <utility>
 
 namespace Jadyx {
 /// Launch path the library returns to run the firmware's Mii editor instead of a game.
@@ -84,6 +85,21 @@ inline bool IsGameExtension(std::string_view ext) {
     return ClassifyMediaExtension(ext) == MediaKind::SwitchPackage;
 }
 
+// Catalog candidates are wider than Switch-specific upload/import formats.
+inline bool IsCatalogExtension(std::string_view ext) {
+    const auto kind = ClassifyMediaExtension(ext);
+    return kind == MediaKind::SwitchPackage || kind == MediaKind::PS2Disc ||
+           kind == MediaKind::Xbox360Executable;
+}
+
+inline void SetCatalogPlatform(LibraryEntry& entry, MediaKind kind) {
+    entry.platform = PlatformForMedia(kind);
+    if (kind == MediaKind::PS2Disc || kind == MediaKind::Xbox360Executable) {
+        entry.developer = kind == MediaKind::PS2Disc ? L"PlayStation 2" : L"Xbox 360";
+        entry.title_loaded = true; // Filename fallback until a real metadata reader is linked.
+    }
+}
+
 /// Drops the NCAs of an extracted package or firmware from entries[first..]: their folder carries
 /// a .cnmt.nca, and its parts are not games one by one. Scans only see names, never contents.
 template <typename Entry> void DropPackageParts(std::vector<Entry>& entries, std::size_t first = 0) {
@@ -140,9 +156,10 @@ inline LibraryScan ScanGameLibrary(const std::filesystem::path& root,
         auto ext = it->path().extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (!IsGameExtension(ext)) continue;
-        result.entries.push_back({it->path().lexically_relative(root),
-                                  it->path().stem().wstring()});
+        if (!IsCatalogExtension(ext)) continue;
+        LibraryEntry entry{it->path().lexically_relative(root), it->path().stem().wstring()};
+        SetCatalogPlatform(entry, ClassifyMediaExtension(ext));
+        result.entries.push_back(std::move(entry));
     }
     DropPackageParts(result.entries);
     if (ec) result.error = ec.message();
