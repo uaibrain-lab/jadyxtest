@@ -98,6 +98,8 @@ const Catalog SpanishCatalog = MakeCatalog({
     {Text::ScanLimit, L"Límite de exploración alcanzado: 10000 entradas, 5 niveles."},
     {Text::MetadataFailed, L"No se pudieron leer los datos de algunos juegos."},
     {Text::FolderAuthFailed, L"No se pudo autorizar o recuperar la carpeta: {0}"},
+    {Text::UniversalEngineUnavailable, L"El motor de esta plataforma aún no está disponible en esta versión."},
+    {Text::UniversalDiscUnassigned, L"Elige la plataforma de esta ISO antes de jugar. El registro de ISO aún no está disponible en esta versión."},
     {Text::GameLoadFailed, L"No se pudo cargar el juego. Comprueba el USB, los permisos y los datos del juego."},
     {Text::GameStoppedGpu, L"El juego se detuvo por un fallo de gráficos o falta de memoria."},
     {Text::LibraryScanFailed, L"No se pudieron leer algunas carpetas de juegos. Comprueba el USB y sus permisos."},
