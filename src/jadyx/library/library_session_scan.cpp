@@ -233,7 +233,7 @@ void LibrarySession::PollSetup() {
 void LibrarySession::FinishScan() {
     if (loading && future.wait_for(std::chrono::seconds{0}) == std::future_status::ready) {
         // A rescan keeps the game the player was on; the first scan starts at the last one played.
-        const auto kept = selected < scan.entries.size() ? scan.entries[selected].launch_path : std::string{};
+        const auto kept = selected < scan.entries.size() ? scan.entries[selected].launch_path : std::string{initial_focus};
         try {
             auto rescanned = future.get();
             if (keep_titles) KeepKnownTitles(scan.entries, rescanned.entries);
@@ -251,6 +251,7 @@ void LibrarySession::FinishScan() {
         loading = false;
         keep_titles.reset();
         RefreshPlay(kept);
+        initial_focus = {};
         RefreshPulse();
         if (!configuration.busy) RefreshSetup();
         notice = Wide(scan.error);
