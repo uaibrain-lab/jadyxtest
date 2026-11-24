@@ -29,6 +29,9 @@ param(
     # A script kept outside the repo, run with -Layout <package layout folder> before packing: local
     # additions to a test package that never go into the repo.
     [string] $StageScript,
+    # Local development only: prebuilt native PCSX2 runtime and GPL source.
+    [string] $Ps2RuntimeDir,
+    [string] $Ps2ForkSourceDir,
     # Folder library for PC/Series; game files live under the app's LocalState\games.
     [switch] $Library,
     # Diagnostic builds: the in-process sampling profiler (boot.cfg profile=1). "full" also turns on
@@ -74,6 +77,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ([bool]$Ps2RuntimeDir -ne [bool]$Ps2ForkSourceDir) {
+    throw 'Specify both Ps2RuntimeDir and Ps2ForkSourceDir'
+}
+if ($Ps2RuntimeDir -and ($Release -or $Canary -or !$Library)) {
+    throw 'Native PS2 staging is limited to local library packages with the existing identity'
+}
 if ($Release) {
     if ($BootNro -or $Game -or $StageScript -or $Profile -or $Hunt -or $GraphicsCapture -or
         $DebugLayer -or $MaterialProbeShaders -or $RunSeconds -gt 0 -or $BootCfg.Count -gt 0) {
@@ -265,6 +274,11 @@ $priXml.Save($priConfig)
 & $makepri new /pr $priRoot /cf $priConfig /mn (Join-Path $layout "AppxManifest.xml") `
     /of (Join-Path $layout "resources.pri") /o | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "MakePri failed ($LASTEXITCODE)." }
+
+if ($Ps2RuntimeDir) {
+    & python (Join-Path $repo "tools\xbox\stage-embedded-ps2.py") $Ps2RuntimeDir $layout $Ps2ForkSourceDir
+    if ($LASTEXITCODE -ne 0) { throw "Native PS2 staging failed ($LASTEXITCODE)" }
+}
 
 # --- 3. pack -----------------------------------------------------------------------------
 $makeappx = Find-SdkTool "MakeAppx.exe"
