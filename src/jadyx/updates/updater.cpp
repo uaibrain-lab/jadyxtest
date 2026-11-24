@@ -235,7 +235,11 @@ Runtime ProductionRuntime() {
         std::filesystem::path{
             winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path().c_str()} /
         "updates";
-    runtime.public_key = ReleasePublicKey;
+    // Universal Hub is a separate product. Never accept the upstream release key or
+    // reuse upstream update journals while a fork-specific signed feed is unavailable.
+    runtime.folder = runtime.folder.parent_path() / "universal-updates";
+    runtime.public_key.clear();
+    runtime.automatic_check = false;
     runtime.fetch = Http::Fetch;
     runtime.download = Http::DownloadVerified;
     if (!server.empty()) {
@@ -264,8 +268,7 @@ Runtime ProductionRuntime() {
     // PackageManager registers the new version for UserMgr0 only and the console stops
     // launching Jadyx. The app cannot reach the Portal either (loopback isolation). There the
     // verified package goes in through the Device Portal, guided from a phone or PC.
-    if (!IsXbox())
-        runtime.deploy = DeployPackage;
+    // No production deployment until this fork has its own signed release policy.
     return runtime;
 }
 } // namespace
@@ -292,6 +295,8 @@ Snapshot Updater::Status() const {
 void Updater::Check(bool force) {
     std::lock_guard operation_lock{impl->operation};
     auto& p = *impl;
+    if (p.runtime.public_key.empty())
+        return;
     {
         std::lock_guard lock{p.mutex};
         if (Active(p.state.phase) || p.state.phase == Phase::Requested ||
