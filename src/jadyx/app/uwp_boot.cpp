@@ -43,6 +43,7 @@
 #include "jadyx/app/boot_diag.h"
 #include "jadyx/app/boot_session.h"
 #include "jadyx/app/native_ps2.h"
+#include "jadyx/app/native_xenia.h"
 #include "jadyx/app/boot_state.h"
 #include "jadyx/app/user_data_seed.h"
 #include "jadyx/i18n/localization.h"
@@ -593,6 +594,24 @@ struct BootView : implements<BootView, IFrameworkViewSource, IFrameworkView> {
             if (!ChooseLaunch(surface, session, library_error, library_active, choice, focus_path)) return;
             if (choice.library_game && *choice.library_game != MiiEditorLaunch)
                 focus_path = *choice.library_game;
+
+            if (choice.library_game && NativeXeniaCandidate(*choice.library_game)) {
+                Jadyx::ReleaseLaunchSplash();
+                window.Dispatcher().ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+                library_active = true;
+                const int status = RunNativeXenia(window, choice.game_surface, *choice.library_game);
+                library_active = false;
+                if (status == NativeXeniaReleaseFailed) return;
+                if (status == RETURN_TO_LIBRARY) {
+                    library_error.clear();
+                    continue;
+                }
+                if (auto notice = LibraryNotice(status)) {
+                    library_error = std::move(*notice);
+                    continue;
+                }
+                return;
+            }
 
             if (choice.library_game && NativePs2Candidate(*choice.library_game)) {
                 // The library has stopped its workers and released its D3D12 canvas.
