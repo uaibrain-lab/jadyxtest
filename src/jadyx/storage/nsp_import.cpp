@@ -182,6 +182,31 @@ std::string ValidateUploadedGame(const std::filesystem::path& path, const std::s
     if (!file) return "disk";
     auto lower=name;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (stop.stop_requested()) return "interrupted";
+    // Foreign media is catalogued, not declared playable. Validate bounded headers
+    // before publication; the engine performs full media validation at launch.
+    if (lower.ends_with(".chd") || lower.ends_with(".xex")) {
+        const auto header = file->ReadBytes(24);
+        if (header.size() != 24) return "incomplete";
+        const auto be32 = [&](std::size_t i) {
+            return (u32{header[i]} << 24) | (u32{header[i+1]} << 16) |
+                   (u32{header[i+2]} << 8) | u32{header[i+3]};
+        };
+        const auto size = file->GetSize();
+        if (lower.ends_with(".chd")) {
+            if (!Magic(file, 0, "MComprHD")) return "file";
+            const auto length = be32(8), version = be32(12);
+            if (!((version == 3 && length == 120) || (version == 4 && length == 108) ||
+                  (version == 5 && length == 124))) return "file";
+            return size > length ? std::string{} : "incomplete";
+        }
+        if (!Magic(file, 0, "XEX2")) return "file";
+        const auto image = be32(8), security = be32(16), count = be32(20);
+        const u64 table_end = 24 + u64{count} * 8;
+        if (count > 4096 || table_end > security || security >= image || image >= size)
+            return "file";
+        return {};
+    }
     // The loader tells the format from the contents and refuses a file whose extension names
     // another one, so the name has to agree with what the header says.
     // NSZ is an NSP with compressed NCAs; XCZ is the same for a cartridge image, or a PFS0 the

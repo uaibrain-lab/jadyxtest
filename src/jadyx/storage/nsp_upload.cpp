@@ -78,7 +78,8 @@ bool ValidName(const std::string& name, bool system_files = false, const std::st
     const bool allowed = system_files ? lower.ends_with(".zip") || lower.ends_with(".nca") || lower=="prod.keys" || lower=="title.keys"
                          : SaveTag(tag) ? lower.ends_with(".zip") || lower.ends_with(".7z") || lower.ends_with(".rar")
                                         : lower.ends_with(".nsp") || lower.ends_with(".xci") || lower.ends_with(".nro") ||
-                                          lower.ends_with(".nsz") || lower.ends_with(".xcz") || lower.ends_with(".nca");
+                                          lower.ends_with(".nsz") || lower.ends_with(".xcz") || lower.ends_with(".nca") ||
+                                          (tag.empty() && (lower.ends_with(".chd") || lower.ends_with(".xex")));
     if (!allowed) return false;
     const auto stem = lower.substr(0, lower.find('.'));
     if (stem == "con" || stem == "prn" || stem == "aux" || stem == "nul" ||
@@ -401,11 +402,11 @@ UploadResult NspUpload::Ready(const std::string& id) {
     return {};
 }
 UploadResult NspUpload::Rename(const std::string& id, std::string name) {
-    if (!ValidName(name,impl->system_files)) return {400, "file"};
     std::unique_lock operation{impl->operation, std::try_to_lock};
     if (!operation.owns_lock()) return {409, "busy"};
     std::lock_guard lock{impl->mutex};
     if (id.empty() || id != impl->info.id) return {404, "upload"};
+    if (!ValidName(name,impl->system_files,impl->info.tag)) return {400, "file"};
     if (impl->info.error == "recovery") return {409,"recovery"};
     if (impl->info.phase == "validating" || impl->info.phase == "ready" || impl->info.phase == "complete") return {409, "busy"};
     try {
