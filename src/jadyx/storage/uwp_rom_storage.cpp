@@ -370,9 +370,9 @@ std::uint64_t StorageFileStamp(std::string_view path) {
 }
 std::vector<StorageBrowserEntry> BrowseStorageFolder(std::string_view path, std::stop_token stop) {
     return BrowseStorageFolder(path, stop, [](std::string_view name) {
-        auto ext = std::filesystem::u8path(name).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
-        return ext == ".nsp" || ext == ".xci" || ext == ".nca" || ext == ".nsz" || ext == ".xcz";
+        const auto kind = ClassifyMediaPath(name);
+        return kind == MediaKind::SwitchPackage || kind == MediaKind::PS2Disc ||
+               kind == MediaKind::Xbox360Executable;
     });
 }
 
