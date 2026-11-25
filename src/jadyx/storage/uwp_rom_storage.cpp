@@ -466,6 +466,27 @@ LibraryScan ScanExternalGameFolders(std::stop_token stop) {
 
 FileSys::VirtualFilesystem MakeUwpFilesystem() { return std::make_shared<UwpFilesystem>(); }
 
+std::wstring ResolveDirectExternalGame(std::string_view path) {
+    const auto parsed = ParseStoragePath(path);
+    if (!parsed || !IsGameToken(parsed->token) || parsed->relative.empty()) return {};
+    try {
+        EnsureStorageApartment();
+        const auto slash = parsed->relative.rfind('/');
+        const auto parent = slash == std::string::npos ? "" : parsed->relative.substr(0, slash);
+        const auto name = slash == std::string::npos ? parsed->relative : parsed->relative.substr(slash + 1);
+        auto file = ResolveFolder(*parsed, parent).GetFileAsync(winrt::to_hstring(name)).get();
+        std::wstring native{file.Path()};
+        if (native.empty()) return {};
+        const HANDLE handle = CreateFile2FromAppW(native.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                                  OPEN_EXISTING, nullptr);
+        if (handle == INVALID_HANDLE_VALUE) return {};
+        LARGE_INTEGER size{};
+        const bool readable = GetFileSizeEx(handle, &size) && size.QuadPart > 0;
+        CloseHandle(handle);
+        return readable ? native : std::wstring{};
+    } catch (...) { return {}; }
+}
+
 std::string CheckExternalGame(std::string_view path) {
     if (!IsStoragePath(path)) return {};
     try {

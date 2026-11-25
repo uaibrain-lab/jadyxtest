@@ -3,6 +3,7 @@
 #pragma once
 #include <chrono>
 #include <filesystem>
+#include <future>
 #include <string>
 #include <windows.h>
 #include <winrt/Windows.ApplicationModel.h>
@@ -15,6 +16,7 @@
 #include "jadyx/library/game_library.h"
 #include "jadyx/library/play_history.h"
 #include "jadyx/storage/storage_path.h"
+#include "jadyx/storage/uwp_rom_storage.h"
 
 namespace Jadyx {
 inline constexpr int NativePs2Unavailable = 10001;
@@ -32,7 +34,7 @@ inline bool NativePs2Staged() {
 }
 
 inline bool NativePs2Candidate(std::string_view path) {
-    return ClassifyMediaPath(path) == MediaKind::PS2Disc && !IsStoragePath(path);
+    return ClassifyMediaPath(path) == MediaKind::PS2Disc;
 }
 
 // Runs on the owning CoreWindow UI thread. PCSX2 starts its own CPU thread;
@@ -40,6 +42,25 @@ inline bool NativePs2Candidate(std::string_view path) {
 inline int RunNativePs2(const winrt::Windows::UI::Core::CoreWindow& window,
                         const BootSurface& surface, const std::string& path) {
     if (!NativePs2Staged() || !NativePs2Candidate(path)) return NativePs2Unavailable;
+    // Resolve only the existing authorized game-folder token, not arbitrary USB paths.
+    // The physical path is transient; history and focus continue using the logical path.
+    std::wstring native_game;
+    try {
+        if (IsStoragePath(path)) {
+            bool closed = false;
+            auto close = window.Closed(winrt::auto_revoke, [&](auto&&, auto&&) { closed = true; });
+            auto task = std::async(std::launch::async, [path] { return ResolveDirectExternalGame(path); });
+            while (task.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+                window.Dispatcher().ProcessEvents(winrt::Windows::UI::Core::CoreProcessEventsOption::ProcessAllIfPresent);
+                ::Sleep(16);
+            }
+            native_game = task.get();
+            if (closed) return 0;
+            if (native_game.empty()) { WriteDiag("PS2: authorized media has no direct FromApp access"); return 16; }
+        } else {
+            native_game = winrt::to_hstring(path).c_str();
+        }
+    } catch (...) { WriteDiag("PS2: media resolution failed"); return 16; }
     // Keep the module loaded for the process lifetime: WinRT callbacks may
     // still have code addresses in it even after the VM/CPU thread is joined.
     static HMODULE module = LoadPackagedLibrary(L"uaibrain_ps2_embedded.dll", 0);
@@ -58,11 +79,10 @@ inline int RunNativePs2(const winrt::Windows::UI::Core::CoreWindow& window,
     bool attached = false;
     int result = 2;
     try {
-        const auto game = winrt::to_hstring(path);
         const auto local = winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();
         attached = api->attach_xaml_surface(surface.core_window, surface.width, surface.height) != 0;
         if (attached && api->is_ready() &&
-            api->boot_disc(game.c_str(), local.c_str(), 0) == UAIBRAIN_PS2_V2_BOOT_ACCEPTED) {
+            api->boot_disc(native_game.c_str(), local.c_str(), 0) == UAIBRAIN_PS2_V2_BOOT_ACCEPTED) {
             using namespace winrt::Windows::UI::Core;
             using namespace winrt::Windows::Gaming::Input;
             using Clock = std::chrono::steady_clock;

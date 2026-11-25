@@ -29,6 +29,9 @@ bool ConsumeStorageReadFailure();
 // Bounded preflight, run on an MTA worker before starting the guest. Reports
 // access/removal errors in the library instead of closing the application.
 std::string CheckExternalGame(std::string_view path);
+// MTA worker only. Resolve a game-folder token to a native path only if
+// the same AppContainer can open it read-only via FromApp. Empty on failure.
+std::wstring ResolveDirectExternalGame(std::string_view path);
 // Opt-in AppContainer gate against a sparse fixture prepared by rom-storage-gate.ps1.
 bool RunRomStorageGate(bool restore, const std::function<void(std::string)>& diagnostic);
 } // namespace Jadyx
