@@ -79,7 +79,9 @@ bool ValidName(const std::string& name, bool system_files = false, const std::st
                          : SaveTag(tag) ? lower.ends_with(".zip") || lower.ends_with(".7z") || lower.ends_with(".rar")
                                         : lower.ends_with(".nsp") || lower.ends_with(".xci") || lower.ends_with(".nro") ||
                                           lower.ends_with(".nsz") || lower.ends_with(".xcz") || lower.ends_with(".nca") ||
-                                          (tag.empty() && (lower.ends_with(".chd") || lower.ends_with(".xex")));
+                                          (tag.empty() && (lower.ends_with(".chd") || lower.ends_with(".xex") ||
+                                              (lower.size() > 8 && lower.ends_with(".ps2.iso")) ||
+                                              (lower.size() > 9 && lower.ends_with(".x360.iso"))));
     if (!allowed) return false;
     const auto stem = lower.substr(0, lower.find('.'));
     if (stem == "con" || stem == "prn" || stem == "aux" || stem == "nul" ||

@@ -185,6 +185,37 @@ std::string ValidateUploadedGame(const std::filesystem::path& path, const std::s
     if (stop.stop_requested()) return "interrupted";
     // Foreign media is catalogued, not declared playable. Validate bounded headers
     // before publication; the engine performs full media validation at launch.
+    if (lower.ends_with(".iso")) {
+        const auto size = file->GetSize();
+        // A DVD ISO9660 primary volume descriptor: reject truncated/misaligned
+        // images. This is structural screening, not proof of a PS2 title.
+        if (lower.size() > 8 && lower.ends_with(".ps2.iso")) {
+            if (size < 17 * 2048 || size % 2048) return "file";
+            const auto pvd = file->ReadBytes(7, 16 * 2048);
+            return pvd.size() == 7 && pvd[0] == 1 && pvd[6] == 1 &&
+                   Magic(file, 16 * 2048 + 1, "CD001") ? std::string{} : "file";
+        }
+        if (lower.size() > 9 && lower.ends_with(".x360.iso")) {
+            // Same candidate partition offsets as Xenia DiscImageDevice::Verify.
+            constexpr std::size_t bases[] = {0, 0xFB20, 0x20600, 0x02080000, 0x0FD90000};
+            for (const auto base : bases) {
+                if (stop.stop_requested()) return "interrupted";
+                const auto offset = base + 32 * 2048;
+                if (size < offset + 28 || !Magic(file, offset, "MICROSOFT*XBOX*MEDIA")) continue;
+                const auto bytes = file->ReadBytes(8, offset + 20);
+                if (bytes.size() != 8) continue;
+                const auto le32 = [&](std::size_t i) {
+                    return u32{bytes[i]} | (u32{bytes[i+1]} << 8) |
+                           (u32{bytes[i+2]} << 16) | (u32{bytes[i+3]} << 24);
+                };
+                const u64 root = u64{base} + u64{le32(0)} * 2048;
+                const u64 length = le32(4);
+                if (length >= 13 && length <= 32 * 1024 * 1024 &&
+                    root <= size && length <= size - root) return {};
+            }
+        }
+        return "file";
+    }
     if (lower.ends_with(".chd") || lower.ends_with(".xex")) {
         const auto header = file->ReadBytes(24);
         if (header.size() != 24) return "incomplete";
