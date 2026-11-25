@@ -332,11 +332,10 @@ void ScanFolder(StorageFolder folder, const std::string& token, const std::wstri
                 }
             } else {
                 const auto p = std::filesystem::path{winrt::to_hstring(child).c_str()};
-                auto ext = p.extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                if (!IsCatalogExtension(ext)) continue;
+                const auto kind = ClassifyMediaPath(name);
+                if (!IsCatalogMedia(kind)) continue;
                 LibraryEntry entry{p, p.stem().wstring()};
-                SetCatalogPlatform(entry, ClassifyMediaExtension(ext));
+                SetCatalogPlatform(entry, kind);
                 entry.launch_path = MakeStoragePath(token, child);
                 entry.source_name = source;
                 // Enumerated items carry their dates: no extra call per file.
@@ -371,8 +370,7 @@ std::uint64_t StorageFileStamp(std::string_view path) {
 std::vector<StorageBrowserEntry> BrowseStorageFolder(std::string_view path, std::stop_token stop) {
     return BrowseStorageFolder(path, stop, [](std::string_view name) {
         const auto kind = ClassifyMediaPath(name);
-        return kind == MediaKind::SwitchPackage || kind == MediaKind::PS2Disc ||
-               kind == MediaKind::Xbox360Executable;
+        return IsCatalogMedia(kind);
     });
 }
 

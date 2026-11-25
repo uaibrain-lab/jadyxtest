@@ -58,7 +58,7 @@ void ReadLibraryMetadata(const std::filesystem::path& root, std::vector<LibraryE
             entry.display_version.clear();
             entry.icon.clear();
             entry.developer = media == MediaKind::PS2Disc ? L"PlayStation 2" :
-                              media == MediaKind::Xbox360Executable ? L"Xbox 360" : L"";
+                              (media == MediaKind::Xbox360Executable || media == MediaKind::Xbox360Disc) ? L"Xbox 360" : L"";
             entry.title_loaded = true;
             continue; // Never open a foreign image in the Eden loader or its metadata cache.
         }

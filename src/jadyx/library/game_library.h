@@ -21,7 +21,7 @@ inline constexpr std::string_view MiiEditorLaunch = "jadyx:mii-editor";
 // Stable platform tags for catalog and storage routing, independent of guest title IDs.
 enum class GamePlatform : std::uint8_t { Switch = 0, PS2 = 1, Xbox360 = 2, NativePort = 3 };
 
-enum class MediaKind : std::uint8_t { Unknown, SwitchPackage, PS2Disc, Xbox360Executable, AmbiguousDisc };
+enum class MediaKind : std::uint8_t { Unknown, SwitchPackage, PS2Disc, Xbox360Executable, AmbiguousDisc, Xbox360Disc };
 
 // Extension-only recognition is a candidate, never a claim that a file is valid or playable.
 constexpr MediaKind ClassifyMediaExtension(std::string_view ext) {
@@ -42,12 +42,22 @@ inline MediaKind ClassifyMediaPath(std::string_view path) {
     std::string ext{path.substr(dot)};
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-    return ClassifyMediaExtension(ext);
+    const auto kind = ClassifyMediaExtension(ext);
+    if (kind != MediaKind::AmbiguousDisc) return kind;
+    // An explicit filename suffix persists the user's platform choice across
+    // internal/USB scans. Bare .iso is never guessed from the file extension.
+    std::string name{path.substr(separator == std::string_view::npos ? 0 : separator + 1)};
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    if (name.size() > 8 && name.ends_with(".ps2.iso")) return MediaKind::PS2Disc;
+    if (name.size() > 9 && name.ends_with(".x360.iso")) return MediaKind::Xbox360Disc;
+    return kind;
 }
 
 inline GamePlatform PlatformForMedia(MediaKind kind) {
     switch (kind) {
     case MediaKind::PS2Disc: return GamePlatform::PS2;
+    case MediaKind::Xbox360Disc:
     case MediaKind::Xbox360Executable: return GamePlatform::Xbox360;
     default: return GamePlatform::Switch;
     }
@@ -55,7 +65,7 @@ inline GamePlatform PlatformForMedia(MediaKind kind) {
 
 inline bool IsForeignMedia(MediaKind kind) {
     return kind == MediaKind::PS2Disc || kind == MediaKind::Xbox360Executable ||
-           kind == MediaKind::AmbiguousDisc;
+           kind == MediaKind::Xbox360Disc || kind == MediaKind::AmbiguousDisc;
 }
 
 struct LibraryEntry {
@@ -92,9 +102,15 @@ inline bool IsCatalogExtension(std::string_view ext) {
            kind == MediaKind::Xbox360Executable;
 }
 
+inline bool IsCatalogMedia(MediaKind kind) {
+    return kind == MediaKind::SwitchPackage || kind == MediaKind::PS2Disc ||
+           kind == MediaKind::Xbox360Executable || kind == MediaKind::Xbox360Disc;
+}
+
 inline void SetCatalogPlatform(LibraryEntry& entry, MediaKind kind) {
     entry.platform = PlatformForMedia(kind);
-    if (kind == MediaKind::PS2Disc || kind == MediaKind::Xbox360Executable) {
+    if (kind == MediaKind::PS2Disc || kind == MediaKind::Xbox360Executable ||
+        kind == MediaKind::Xbox360Disc) {
         entry.developer = kind == MediaKind::PS2Disc ? L"PlayStation 2" : L"Xbox 360";
         entry.title_loaded = true; // Filename fallback until a real metadata reader is linked.
     }
@@ -153,12 +169,11 @@ inline LibraryScan ScanGameLibrary(const std::filesystem::path& root,
         }
         if (it.depth() >= 4) it.disable_recursion_pending();
         if (!std::filesystem::is_regular_file(status)) continue;
-        auto ext = it->path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (!IsCatalogExtension(ext)) continue;
+        const auto encoded = it->path().filename().u8string();
+        const auto kind = ClassifyMediaPath(std::string{encoded.begin(), encoded.end()});
+        if (!IsCatalogMedia(kind)) continue;
         LibraryEntry entry{it->path().lexically_relative(root), it->path().stem().wstring()};
-        SetCatalogPlatform(entry, ClassifyMediaExtension(ext));
+        SetCatalogPlatform(entry, kind);
         result.entries.push_back(std::move(entry));
     }
     DropPackageParts(result.entries);
