@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 Jadyx Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <chrono>
 #include <filesystem>
 #include <string>
 #include <windows.h>
@@ -64,6 +65,15 @@ inline int RunNativePs2(const winrt::Windows::UI::Core::CoreWindow& window,
             api->boot_disc(game.c_str(), local.c_str(), 0) == UAIBRAIN_PS2_V2_BOOT_ACCEPTED) {
             using namespace winrt::Windows::UI::Core;
             using namespace winrt::Windows::Gaming::Input;
+            using Clock = std::chrono::steady_clock;
+            constexpr auto startup_limit = std::chrono::minutes(2);
+            constexpr auto shutdown_limit = std::chrono::minutes(1);
+            const auto startup_deadline = Clock::now() + startup_limit;
+            auto shutdown_deadline = Clock::time_point::max();
+            bool window_closed = false;
+            const auto closed = window.Closed(winrt::auto_revoke, [&](auto&&, auto&&) {
+                window_closed = true;
+            });
             bool saw_active = false;
             bool exit_requested = false;
             bool chord_released = false;
@@ -75,7 +85,7 @@ inline int RunNativePs2(const winrt::Windows::UI::Core::CoreWindow& window,
                 const int current = state();
                 if (current == 3 || current == 0) break;
                 if (current == 4) {
-                    result = saw_active ? RETURN_TO_LIBRARY : 2;
+                    result = window_closed ? 0 : (saw_active ? RETURN_TO_LIBRARY : 2);
                     break;
                 }
                 if (current == 2 && !saw_active) {
@@ -90,12 +100,24 @@ inline int RunNativePs2(const winrt::Windows::UI::Core::CoreWindow& window,
                     if ((pad.GetCurrentReading().Buttons & chord) == chord) { pressed = true; break; }
                 }
                 if (!pressed) chord_released = true;
-                if (pressed && chord_released && !exit_requested) {
+                const auto now = Clock::now();
+                const bool startup_expired = !saw_active && now >= startup_deadline;
+                if (!exit_requested && (window_closed || startup_expired ||
+                                        (pressed && chord_released))) {
+                    if (startup_expired) WriteDiag("PS2: VM startup deadline exceeded; requesting stop");
                     exit_requested = true;
+                    shutdown_deadline = now + shutdown_limit;
                     api->request_exit();
+                }
+                if (exit_requested && now >= shutdown_deadline) {
+                    // A pending VM still owns the window. Never return to Eden until the
+                    // provider confirms release; the caller ends this host on failure.
+                    WriteDiag("PS2: VM shutdown deadline exceeded");
+                    break;
                 }
                 ::Sleep(16);
             }
+            if (window_closed) result = 0;
         }
     } catch (...) {
         WriteDiag("PS2: native host exception");
