@@ -10,6 +10,7 @@
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.Gaming.Input.h>
+#include <winrt/Windows.Graphics.Display.h>
 #include "jadyx/app/boot_session.h"
 #include "jadyx/app/boot_diag.h"
 #include "jadyx/library/game_library.h"
@@ -62,7 +63,9 @@ inline int RunNativeXenia(const winrt::Windows::UI::Core::CoreWindow& window,
         if (native_game.empty() || !std::filesystem::path(native_game).is_absolute()) return 16;
     } catch (...) { WriteDiag("Xenia: media resolution failed"); return 16; }
 
-    static HMODULE module = LoadPackagedLibrary(L"uaibrain_xenia_embedded.dll", 0);
+    // Retry a failed load on a subsequent launch; retain successful modules for callbacks.
+    static HMODULE module = nullptr;
+    if (!module) module = LoadPackagedLibrary(L"uaibrain_xenia_embedded.dll", 0);
     if (!module) { WriteDiag("Xenia: packaged DLL unavailable"); return NativeXeniaUnavailable; }
     using Version = uint32_t (*)();
     using Create = void* (*)(IUnknown*, uint32_t, uint32_t, const wchar_t*);
@@ -97,7 +100,17 @@ inline int RunNativeXenia(const winrt::Windows::UI::Core::CoreWindow& window,
             for (;;) {
                 dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
                 if (closed) { result = 0; break; }
-                const int state = tick(handle, surface.width, surface.height, focused ? 1 : 0);
+                // CoreWindow bounds are DIPs; the runtime expects physical pixels.
+                uint32_t width = surface.width, height = surface.height;
+                try {
+                    const auto bounds = window.Bounds();
+                    const auto scale = winrt::Windows::Graphics::Display::DisplayInformation::GetForCurrentView().RawPixelsPerViewPixel();
+                    if (bounds.Width > 0 && bounds.Height > 0 && scale > 0) {
+                        width = static_cast<uint32_t>(bounds.Width * scale + 0.5);
+                        height = static_cast<uint32_t>(bounds.Height * scale + 0.5);
+                    }
+                } catch (...) {} // retain the launch dimensions if display information is unavailable
+                const int state = tick(handle, width, height, focused ? 1 : 0);
                 if (state == -1 || state < -1 || state > 2) break;
                 if (state == 2) { result = saw_running ? RETURN_TO_LIBRARY : 2; break; }
                 if (state == 1 && !saw_running) {
