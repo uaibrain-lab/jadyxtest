@@ -113,6 +113,7 @@ inline int RunNativeXenia(const winrt::Windows::UI::Core::CoreWindow& window,
                     }
                 } catch (...) {} // retain the launch dimensions if display information is unavailable
                 const int state = tick(handle, width, height, focused ? 1 : 0);
+                if (history) history->Tick(state == 1 && focused);
                 if (state == -1 || state < -1 || state > 2) break;
                 if (state == 2) { result = saw_running ? RETURN_TO_LIBRARY : 2; break; }
                 if (state == 1 && !saw_running) {
