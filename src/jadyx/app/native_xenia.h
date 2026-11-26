@@ -4,6 +4,7 @@
 #include <chrono>
 #include <filesystem>
 #include <future>
+#include <optional>
 #include <string>
 #include <windows.h>
 #include <winrt/Windows.ApplicationModel.h>
@@ -82,6 +83,7 @@ inline int RunNativeXenia(const winrt::Windows::UI::Core::CoreWindow& window,
 
     void* handle = nullptr;
     int result = 2;
+    std::optional<PlaySession> history;
     try {
         auto close = window.Closed(winrt::auto_revoke, [&](auto&&, auto&&) { closed = true; });
         auto activation = window.Activated(winrt::auto_revoke, [&](auto&&, const WindowActivatedEventArgs& args) {
@@ -116,7 +118,7 @@ inline int RunNativeXenia(const winrt::Windows::UI::Core::CoreWindow& window,
                 if (state == 1 && !saw_running) {
                     saw_running = true;
                     WriteDiag("Xenia: guest running (not first-frame proof)");
-                    try { PlaySession history{path, 0}; } catch (...) {}
+                    try { history.emplace(path, 0); } catch (...) {}
                 }
                 bool pressed = false;
                 for (const auto& pad : Gamepad::Gamepads()) {
