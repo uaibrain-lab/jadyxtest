@@ -60,6 +60,7 @@ inline int RunNativeXenia(const winrt::Windows::UI::Core::CoreWindow& window,
         } else {
             native_game = winrt::to_hstring(path).c_str();
         }
+        window.Dispatcher().ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
         if (closed) return 0;
         if (native_game.empty() || !std::filesystem::path(native_game).is_absolute()) return 16;
     } catch (...) { WriteDiag("Xenia: media resolution failed"); return 16; }
