@@ -376,3 +376,20 @@ if (MSVC)
         target_link_libraries(jadyx PRIVATE delayimp.lib)
     endif()
 endif()
+
+# Optional, locally built UWP Xenia runtime. Keep the default Switch-only build unchanged.
+set(JADYX_XENIA_RUNTIME_DIR "" CACHE PATH "Directory containing the built x64 UWP Xenia runtime DLL")
+if (JADYX_XENIA_RUNTIME_DIR)
+    set(_xenia_dll "${JADYX_XENIA_RUNTIME_DIR}/uaibrain_xenia_embedded.dll")
+    if (NOT EXISTS "${_xenia_dll}")
+        message(FATAL_ERROR "Jadyx: missing embedded Xenia runtime: ${_xenia_dll}")
+    endif()
+    # VS package deployment consumes these items; non-VS staging consumes the executable directory.
+    set_source_files_properties("${_xenia_dll}" PROPERTIES
+        VS_DEPLOYMENT_CONTENT 1 VS_DEPLOYMENT_LOCATION "." HEADER_FILE_ONLY TRUE)
+    target_sources(jadyx PRIVATE "${_xenia_dll}")
+    add_custom_command(TARGET jadyx POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${_xenia_dll}" "$<TARGET_FILE_DIR:jadyx>/uaibrain_xenia_embedded.dll"
+        VERBATIM)
+endif()
