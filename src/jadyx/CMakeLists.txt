@@ -384,12 +384,32 @@ if (JADYX_XENIA_RUNTIME_DIR)
     if (NOT EXISTS "${_xenia_dll}")
         message(FATAL_ERROR "Jadyx: missing embedded Xenia runtime: ${_xenia_dll}")
     endif()
-    # VS package deployment consumes these items; non-VS staging consumes the executable directory.
-    set_source_files_properties("${_xenia_dll}" PROPERTIES
-        VS_DEPLOYMENT_CONTENT 1 VS_DEPLOYMENT_LOCATION "." HEADER_FILE_ONLY TRUE)
-    target_sources(jadyx PRIVATE "${_xenia_dll}")
-    add_custom_command(TARGET jadyx POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${_xenia_dll}" "$<TARGET_FILE_DIR:jadyx>/uaibrain_xenia_embedded.dll"
-        VERBATIM)
+    # The upstream embedded build emits its runtime DLLs and provenance in one directory.
+    # Stage only DLLs from that explicitly selected directory, never a standalone executable.
+    file(GLOB _xenia_runtime_dlls CONFIGURE_DEPENDS "${JADYX_XENIA_RUNTIME_DIR}/*.dll")
+    foreach (_xenia_file IN LISTS _xenia_runtime_dlls)
+        get_filename_component(_xenia_name "${_xenia_file}" NAME)
+        set_source_files_properties("${_xenia_file}" PROPERTIES
+            VS_DEPLOYMENT_CONTENT 1 VS_DEPLOYMENT_LOCATION "." HEADER_FILE_ONLY TRUE)
+        target_sources(jadyx PRIVATE "${_xenia_file}")
+        add_custom_command(TARGET jadyx POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${_xenia_file}" "$<TARGET_FILE_DIR:jadyx>/${_xenia_name}"
+            VERBATIM)
+    endforeach()
+    # Keep engine attribution separate from the host's own license.
+    foreach (_xenia_name IN ITEMS LICENSE source-revision.txt)
+        set(_xenia_file "${JADYX_XENIA_RUNTIME_DIR}/${_xenia_name}")
+        if (NOT EXISTS "${_xenia_file}")
+            message(FATAL_ERROR "Jadyx: missing Xenia provenance file: ${_xenia_file}")
+        endif()
+        set_source_files_properties("${_xenia_file}" PROPERTIES
+            VS_DEPLOYMENT_CONTENT 1 VS_DEPLOYMENT_LOCATION "licenses/xenia" HEADER_FILE_ONLY TRUE)
+        target_sources(jadyx PRIVATE "${_xenia_file}")
+        add_custom_command(TARGET jadyx POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:jadyx>/licenses/xenia"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${_xenia_file}" "$<TARGET_FILE_DIR:jadyx>/licenses/xenia/${_xenia_name}"
+            VERBATIM)
+    endforeach()
 endif()
