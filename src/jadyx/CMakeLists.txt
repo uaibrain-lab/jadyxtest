@@ -384,6 +384,20 @@ if (JADYX_XENIA_RUNTIME_DIR)
     if (NOT EXISTS "${_xenia_dll}")
         message(FATAL_ERROR "Jadyx: missing embedded Xenia runtime: ${_xenia_dll}")
     endif()
+    # Link against the matching import library, but defer DLL loading until the
+    # embedded runtime is actually called so Eden activation stays independent.
+    set(_xenia_implib "${JADYX_XENIA_RUNTIME_DIR}/uaibrain_xenia_embedded.lib")
+    if (NOT EXISTS "${_xenia_implib}")
+        message(FATAL_ERROR "Jadyx: missing embedded Xenia import library: ${_xenia_implib}")
+    endif()
+    add_library(jadyx_xenia_embedded SHARED IMPORTED)
+    set_target_properties(jadyx_xenia_embedded PROPERTIES
+        IMPORTED_LOCATION "${_xenia_dll}"
+        IMPORTED_IMPLIB "${_xenia_implib}")
+    target_link_libraries(jadyx PRIVATE jadyx_xenia_embedded)
+    if (MSVC)
+        target_link_options(jadyx PRIVATE "/DELAYLOAD:uaibrain_xenia_embedded.dll")
+    endif()
     # The upstream embedded build emits its runtime DLLs and provenance in one directory.
     # Stage only DLLs from that explicitly selected directory, never a standalone executable.
     file(GLOB _xenia_runtime_dlls CONFIGURE_DEPENDS "${JADYX_XENIA_RUNTIME_DIR}/*.dll")
